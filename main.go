@@ -30,7 +30,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO come per getIn, fare una funzione getOut che astrae la destinazione.
+	outData, err := getOut(out)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer outData.Close()
 
 	res, err := countWords(indata)
 	if err != nil {
@@ -49,24 +54,33 @@ func main() {
 			log.Fatal(err)
 			return
 		}
-		outResult(out, string(res))
+		outData.Write(res)
 		return
 	}
-
-	outResult(out, fmt.Sprintf("%v", w))
+	enc := json.NewEncoder(outData)
+	enc.Encode(w)
 }
 
-func getIn(in string) (data io.Reader, err error) {
+func getIn(in string) (io.Reader, error) {
 	if in == "-" {
 		return os.Stdin, nil
-	} else /*TODO: else da rimuovere*/ {
-		// TODO: file.Close
-		data, err := os.Open(in)
-		if err != nil {
-			return nil, fmt.Errorf("can't open input file: %s", err)
-		}
-		return data, nil
 	}
+	data, err := os.Open(in)
+	if err != nil {
+		return nil, fmt.Errorf("can't open input file: %s", err)
+	}
+	return data, nil
+}
+
+func getOut(outArg string) (io.WriteCloser, error) {
+	if outArg != "" {
+		file, err := os.Create(outArg)
+		if err != nil {
+			return nil, err
+		}
+		return file, nil
+	}
+	return os.Stdout, nil
 }
 
 func countWords(r io.Reader) (map[string]int, error) {
@@ -97,20 +111,4 @@ func sortWords(m map[string]int, reverse bool) []WordCount {
 	}
 
 	return words
-}
-
-func outResult(outArg string, content string) {
-	if outArg != "" {
-		file, err := os.Create(outArg)
-		if err != nil {
-			// TODO: invece di log.Fatal, meglio fare return del'error e gestirlo nel main
-			log.Fatalf("can't create file: %v", err)
-		}
-		defer file.Close()
-
-		fmt.Fprint(file, content)
-		return
-	}
-
-	fmt.Println(content)
 }
